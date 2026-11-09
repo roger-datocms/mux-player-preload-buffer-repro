@@ -1,0 +1,189 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Mux Player preload buffer reset</title>
+  <script src="https://cdn.jsdelivr.net/npm/@mux/mux-player@3.14.1/dist/mux-player.js"></script>
+  <style>
+    :root { color-scheme: light dark; --fg: #1a1a1a; --bg: #fff; --muted: #666; --line: #ddd; --bad: #b42318; --good: #067647; }
+    @media (prefers-color-scheme: dark) { :root { --fg: #eee; --bg: #111; --muted: #999; --line: #333; --bad: #f97066; --good: #47cd89; } }
+    body { margin: 0 auto; max-width: 960px; padding: 24px 16px; font: 15px/1.5 system-ui, sans-serif; color: var(--fg); background: var(--bg); }
+    h1 { font-size: 22px; margin: 0 0 8px; }
+    p, li { color: var(--muted); }
+    code { font-size: 13px; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 24px; margin-top: 24px; }
+    .case h2 { font-size: 16px; margin: 0 0 4px; }
+    mux-player { width: 100%; aspect-ratio: 16 / 9; display: block; margin: 8px 0; }
+    table { width: 100%; border-collapse: collapse; font-size: 14px; }
+    td, th { text-align: left; padding: 4px 6px; border-bottom: 1px solid var(--line); }
+    th { font-weight: 600; }
+    .bad { color: var(--bad); font-weight: 600; }
+    .good { color: var(--good); font-weight: 600; }
+    pre { overflow-x: auto; font-size: 13px; }
+    .live { margin: 12px 0; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; }
+    .live h3 { font-size: 13px; margin: 0 0 8px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+    .bar { position: relative; height: 12px; border-radius: 6px; background: var(--line); overflow: hidden; }
+    .bar .buffered { position: absolute; inset: 0 auto 0 0; background: #2e90fa; opacity: .55; }
+    .bar .playhead { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--fg); }
+    .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 2px 12px; margin: 8px 0 0; font-size: 14px; }
+    .stats dt { color: var(--muted); }
+    .stats dd { margin: 0; font-variant-numeric: tabular-nums; }
+    .log { margin: 8px 0 0; padding: 0; list-style: none; max-height: 140px; overflow-y: auto; font: 12px/1.6 ui-monospace, monospace; color: var(--muted); }
+  </style>
+</head>
+<body>
+  <h1>Mux Player: <code>preload</code> reverts buffer settings on first play</h1>
+  <p>
+    Reproduction for <a href="https://github.com/muxinc/elements/issues/1382">muxinc/elements#1382</a>,
+    using <code>@mux/mux-player@3.14.1</code>.
+    Both players use <code>preload="metadata"</code>. On <code>loadedmetadata</code>, each sets buffer limits through
+    <code>player._hls.config</code>, as the
+    <a href="https://www.mux.com/docs/pricing/optimizing-video-costs#player-buffer-length">cost optimization guide</a>
+    suggests, and then calls <code>play()</code>. The tables read the config back after playback starts, and the
+    buffered-ahead time 20 seconds later.
+  </p>
+
+  <div class="grid">
+    <section class="case" id="a">
+      <h2>A. <code>maxBufferLength</code> + <code>maxBufferSize</code></h2>
+      <p>Sets <code>maxBufferLength = 10</code>, <code>maxBufferSize = 0</code>.</p>
+      <mux-player playback-id="EcHgOK9coz5K4rjSwOkoE7Y7O01201YMIC200RI6lNxnhs" preload="metadata" muted></mux-player>
+      <div class="live">
+        <h3>Live download status</h3>
+        <div class="bar" title="Buffered range vs. full video"><div class="buffered"></div><div class="playhead"></div></div>
+        <dl class="stats">
+          <dt>State</dt><dd data-k="state">loading…</dd>
+          <dt>Playhead</dt><dd data-k="time">–</dd>
+          <dt>Buffered ahead</dt><dd data-k="ahead">–</dd>
+          <dt>Segments downloaded</dt><dd data-k="segments">0</dd>
+          <dt>Data downloaded</dt><dd data-k="bytes">0.0 MB</dd>
+          <dt>Rendition</dt><dd data-k="level">–</dd>
+        </dl>
+        <ol class="log"></ol>
+      </div>
+      <table><tbody></tbody></table>
+    </section>
+    <section class="case" id="b">
+      <h2>B. Same + <code>maxMaxBufferLength</code></h2>
+      <p>Also sets <code>maxMaxBufferLength = 10</code>, which <code>preload.ts</code> never resets.</p>
+      <mux-player playback-id="EcHgOK9coz5K4rjSwOkoE7Y7O01201YMIC200RI6lNxnhs" preload="metadata" muted></mux-player>
+      <div class="live">
+        <h3>Live download status</h3>
+        <div class="bar" title="Buffered range vs. full video"><div class="buffered"></div><div class="playhead"></div></div>
+        <dl class="stats">
+          <dt>State</dt><dd data-k="state">loading…</dd>
+          <dt>Playhead</dt><dd data-k="time">–</dd>
+          <dt>Buffered ahead</dt><dd data-k="ahead">–</dd>
+          <dt>Segments downloaded</dt><dd data-k="segments">0</dd>
+          <dt>Data downloaded</dt><dd data-k="bytes">0.0 MB</dd>
+          <dt>Rendition</dt><dd data-k="level">–</dd>
+        </dl>
+        <ol class="log"></ol>
+      </div>
+      <table><tbody></tbody></table>
+    </section>
+  </div>
+
+  <h2 style="font-size:16px;margin-top:32px">Expected</h2>
+  <p>
+    In both cases, the values set before play stay in place after play, and the player buffers about 10–15 s ahead.
+    In case A, Mux restores the values saved when hls.js was created (hls.js defaults: 30 s / 60 MB), so the player buffers far beyond 10 s.
+  </p>
+
+  <script>
+    const CASES = {
+      a: { maxBufferLength: 10, maxBufferSize: 0 },
+      b: { maxBufferLength: 10, maxBufferSize: 0, maxMaxBufferLength: 10 },
+    };
+    const KEYS = ['maxBufferLength', 'maxBufferSize', 'maxMaxBufferLength'];
+
+    const bufferedAhead = (player) => {
+      const ranges = player.buffered;
+      return ranges.length ? ranges.end(ranges.length - 1) - player.currentTime : 0;
+    };
+
+    for (const [id, settings] of Object.entries(CASES)) {
+      const section = document.getElementById(id);
+      const player = section.querySelector('mux-player');
+      const tbody = section.querySelector('tbody');
+      const rows = {};
+      const row = (label) => {
+        const tr = tbody.insertRow();
+        tr.insertCell().textContent = label;
+        rows[label] = [tr.insertCell(), tr.insertCell()];
+      };
+      const header = tbody.insertRow();
+      ['', 'Before play', 'After play'].forEach((text) => {
+        const th = document.createElement('th');
+        th.textContent = text;
+        header.append(th);
+      });
+      KEYS.forEach(row);
+      const aheadRow = tbody.insertRow();
+      aheadRow.insertCell().textContent = 'Buffered ahead, 20 s after play';
+      const aheadCell = aheadRow.insertCell();
+      aheadCell.colSpan = 2;
+      aheadCell.textContent = 'waiting…';
+
+      const live = section.querySelector('.live');
+      const field = (key, value) => { live.querySelector(`[data-k="${key}"]`).textContent = value; };
+      const log = live.querySelector('.log');
+      const startedAt = performance.now();
+      let segments = 0;
+      let bytes = 0;
+
+      setInterval(() => {
+        const duration = player.duration;
+        const ahead = bufferedAhead(player);
+        field('state', player.paused ? 'paused' : 'playing');
+        field('time', `${player.currentTime.toFixed(1)} s${Number.isFinite(duration) ? ` / ${duration.toFixed(0)} s` : ''}`);
+        field('ahead', `${ahead.toFixed(1)} s`);
+        if (Number.isFinite(duration) && duration > 0) {
+          const ranges = player.buffered;
+          const end = ranges.length ? ranges.end(ranges.length - 1) : 0;
+          const start = ranges.length ? ranges.start(ranges.length - 1) : 0;
+          const buffered = live.querySelector('.buffered');
+          buffered.style.left = `${(start / duration) * 100}%`;
+          buffered.style.width = `${((end - start) / duration) * 100}%`;
+          live.querySelector('.playhead').style.left = `${(player.currentTime / duration) * 100}%`;
+        }
+      }, 250);
+
+      player.addEventListener('loadedmetadata', () => {
+        const hls = player._hls;
+        hls.on('hlsFragLoaded', (_, data) => {
+          if (data.frag.type !== 'main') return;
+          segments += 1;
+          bytes += data.frag.stats.total;
+          const height = hls.levels[data.frag.level]?.height;
+          field('segments', segments);
+          field('bytes', `${(bytes / 1048576).toFixed(1)} MB`);
+          field('level', height ? `${height}p` : '–');
+          const li = document.createElement('li');
+          const t = ((performance.now() - startedAt) / 1000).toFixed(1);
+          li.textContent = `+${t}s  segment #${data.frag.sn} (${data.frag.start.toFixed(0)}–${(data.frag.start + data.frag.duration).toFixed(0)} s), ${(data.frag.stats.total / 1024).toFixed(0)} KB, ${height ?? '?'}p`;
+          log.prepend(li);
+        });
+        Object.assign(player._hls.config, settings);
+        KEYS.forEach((key) => { rows[key][0].textContent = player._hls.config[key]; });
+        player.play();
+      }, { once: true });
+
+      player.addEventListener('playing', () => {
+        KEYS.forEach((key) => {
+          const after = player._hls.config[key];
+          const cell = rows[key][1];
+          cell.textContent = after;
+          cell.className = key in settings ? (after === settings[key] ? 'good' : 'bad') : '';
+        });
+        setTimeout(() => {
+          const ahead = bufferedAhead(player);
+          aheadCell.textContent = `${ahead.toFixed(1)} s`;
+          aheadCell.className = ahead <= 16 ? 'good' : 'bad';
+        }, 20000);
+      }, { once: true });
+    }
+  </script>
+</body>
+</html>
